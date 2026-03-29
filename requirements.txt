@@ -1,0 +1,4 @@
+playwright
+httpx
+chromium
+python-dotenv
