@@ -14,7 +14,7 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
-from urllib.parse import urlencode, parse_qs, urlparse
+from urllib.parse import urlencode
 
 import httpx
 from bs4 import BeautifulSoup
@@ -26,17 +26,21 @@ from playwright.async_api import async_playwright
 # ---------------------------------------------------------------------------
 load_dotenv()
 
-LINKEDIN_URLS = [
-    "https://www.linkedin.com/jobs/search/?keywords=marketing+coordinator&f_TPR=r3600&geoId=102454443&f_E=1%2C2",
-    "https://www.linkedin.com/jobs/search/?keywords=communications+coordinator&f_TPR=r3600&geoId=102454443&f_E=1%2C2",
-    "https://www.linkedin.com/jobs/search/?keywords=corporate+communications&f_TPR=r3600&geoId=102454443&f_E=1%2C2",
-    "https://www.linkedin.com/jobs/search/?keywords=business+development+associate&f_TPR=r3600&geoId=102454443&f_E=1%2C2",
-    "https://www.linkedin.com/jobs/search/?keywords=partnerships+coordinator&f_TPR=r3600&geoId=102454443&f_E=1%2C2",
-    "https://www.linkedin.com/jobs/search/?keywords=programme+coordinator&f_TPR=r3600&geoId=102454443&f_E=1%2C2",
-    "https://www.linkedin.com/jobs/search/?keywords=project+coordinator&f_TPR=r3600&geoId=102454443&f_E=1%2C2",
-    "https://www.linkedin.com/jobs/search/?keywords=talent+acquisition+coordinator&f_TPR=r3600&geoId=102454443&f_E=1%2C2",
-    "https://www.linkedin.com/jobs/search/?keywords=recruiter+associate&f_TPR=r3600&geoId=102454443&f_E=1%2C2",
+SEARCH_KEYWORDS = [
+    "marketing coordinator",
+    "communications coordinator",
+    "corporate communications",
+    "business development associate",
+    "partnerships coordinator",
+    "programme coordinator",
+    "project coordinator",
+    "talent acquisition coordinator",
+    "recruiter associate",
 ]
+
+GEO_ID      = "102454443"   # Singapore
+TIME_RANGE  = "r3600"       # posted in the last hour
+EXP_LEVEL   = "1,2"         # internship + entry level
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID   = os.getenv("TELEGRAM_CHAT_ID")
@@ -113,7 +117,7 @@ def is_new(conn: sqlite3.Connection, job_id: str) -> bool:
     ).fetchone() is None
 
 
-def mark_sent(conn: sqlite3.Connection, job_ids: list[str]) -> None:
+def mark_sent(conn: sqlite3.Connection, job_ids: list) -> None:
     now = datetime.utcnow().isoformat()
     conn.executemany(
         "INSERT OR REPLACE INTO seen_jobs (job_id, sent_at) VALUES (?, ?)",
@@ -122,17 +126,17 @@ def mark_sent(conn: sqlite3.Connection, job_ids: list[str]) -> None:
     conn.commit()
 
 # ---------------------------------------------------------------------------
-# Scraper — uses LinkedIn's guest API (no login required)
+# Scraper
 # ---------------------------------------------------------------------------
 
-async def scrape_jobs(url: str) -> list[str]:
-    parsed = urlparse(url)
-    params = {k: v[0] for k, v in parse_qs(parsed.query, keep_blank_values=True).items()}
-    params["start"] = "0"
-
+async def scrape_jobs(keyword: str) -> list:
     api_url = (
         "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?"
-        + urlencode(params)
+        + urlencode({
+            "keywords": keyword,
+            "geoId":    GEO_ID,
+            "f_TPR":    TIME_RANGE,
+        })
     )
 
     try:
@@ -140,7 +144,7 @@ async def scrape_jobs(url: str) -> list[str]:
             r = await client.get(api_url)
             r.raise_for_status()
     except Exception as exc:
-        log.error(f"Failed fetching jobs: {exc}")
+        log.error(f"Failed fetching '{keyword}': {exc}")
         return []
 
     soup = BeautifulSoup(r.text, "html.parser")
@@ -158,7 +162,7 @@ async def scrape_jobs(url: str) -> list[str]:
 # Job detail fetcher
 # ---------------------------------------------------------------------------
 
-async def fetch_job_details(job_ids: list[str]) -> list[dict]:
+async def fetch_job_details(job_ids: list) -> list:
     if not job_ids:
         return []
 
@@ -210,7 +214,7 @@ async def fetch_job_details(job_ids: list[str]) -> list[dict]:
 # Telegram
 # ---------------------------------------------------------------------------
 
-async def send_telegram(jobs: list[dict]) -> None:
+async def send_telegram(jobs: list) -> None:
     api_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
 
     async with httpx.AsyncClient(timeout=10) as client:
@@ -260,10 +264,9 @@ async def main(reset: bool = False) -> None:
         conn.commit()
         log.info("DB reset.")
 
-    all_ids: list[str] = []
-    for url in LINKEDIN_URLS:
-        ids = await scrape_jobs(url)
-        keyword = url.split("keywords=")[1].split("&")[0].replace("+", " ")
+    all_ids = []
+    for keyword in SEARCH_KEYWORDS:
+        ids = await scrape_jobs(keyword)
         log.info(f"[{len(ids):>2}] {keyword}")
         all_ids.extend(ids)
 
