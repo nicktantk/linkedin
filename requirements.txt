@@ -1,4 +1,4 @@
 playwright
 httpx
-chromium
+beautifulsoup4
 python-dotenv
