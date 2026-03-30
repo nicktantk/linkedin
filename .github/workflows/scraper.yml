@@ -30,17 +30,8 @@ jobs:
           echo "cwd=$(pwd)"
           ls -la
           if [ -f seen_jobs.db ]; then
-            python - <<'PY'
-          import sqlite3
-          conn = sqlite3.connect('seen_jobs.db')
-          try:
-            count = conn.execute('select count(*) from seen_jobs').fetchone()[0]
-            print(f'pre-run seen_jobs rows={count}')
-          except Exception as exc:
-            print(f'pre-run db exists but query failed: {exc}')
-          finally:
-            conn.close()
-          PY
+            count=$(sqlite3 seen_jobs.db "select count(*) from seen_jobs;" 2>/dev/null || echo "uninitialized")
+            echo "pre-run seen_jobs rows=${count}"
           else
             echo "pre-run seen_jobs.db not found"
           fi
@@ -55,17 +46,8 @@ jobs:
         if: always()
         run: |
           if [ -f seen_jobs.db ]; then
-            python - <<'PY'
-          import sqlite3
-          conn = sqlite3.connect('seen_jobs.db')
-          try:
-            count = conn.execute('select count(*) from seen_jobs').fetchone()[0]
-            print(f'post-run seen_jobs rows={count}')
-          except Exception as exc:
-            print(f'post-run db exists but query failed: {exc}')
-          finally:
-            conn.close()
-          PY
+            count=$(sqlite3 seen_jobs.db "select count(*) from seen_jobs;" 2>/dev/null || echo "uninitialized")
+            echo "post-run seen_jobs rows=${count}"
           else
             echo "post-run seen_jobs.db not found"
           fi
