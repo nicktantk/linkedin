@@ -38,10 +38,10 @@ SEARCH_KEYWORDS = [
     "recruiter associate",
 ]
 
-GEO_ID      = "102454443"   # Singapore
+GEO_ID      = "102454443"    # Singapore
 TIME_RANGE  = "r10800"       # posted in the last 3 hours
-EXP_LEVEL   = "1,2"         # internship + entry level
-MIN_FOLLOWERS = 1000
+EXP_LEVEL   = "2"            # entry level
+MIN_FOLLOWERS = 10000
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID   = os.getenv("TELEGRAM_CHAT_ID")
