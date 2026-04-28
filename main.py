@@ -321,7 +321,7 @@ async def send_telegram(jobs: list) -> None:
                 f"🏢 Company: {escape_md(truncate(job['company'], 120))}\n\n"
                 f"👥 Followers: {job['followers'] if job['followers'] is not None else 'N/A'}\n\n"
                 f"🗿 Size: {escape_md(truncate(job['company_size'], 100)) if job['company_size'] else 'N/A'}\n\n"
-                f"*📌 Highlights:*\n{bullets}\n\n"
+                # f"*📌 Highlights:*\n{bullets}\n\n"
                 f"[View on LinkedIn]({job_url})",
                 3500,
             )
